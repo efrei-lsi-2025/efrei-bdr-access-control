@@ -13,6 +13,8 @@ SELECT * FROM Person;
 EXPLAIN
     SELECT * FROM Gate;
 
+SELECT COUNT(*) FROM Person;
+
 EXPLAIN
     SELECT Person.name, GateGroup.name, AccessRight.expirationdate
     FROM AccessRight
