@@ -1,0 +1,1 @@
+EXPLAIN ANALYZE SELECT * FROM distributed.person_view WHERE region = 'US';

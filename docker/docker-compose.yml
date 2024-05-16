@@ -1,0 +1,40 @@
+version: "3"
+
+services:
+  coordinator:
+    image: "citusdata/citus:12.1.3"
+    ports:
+      - 5432:5432
+    labels:
+      - "com.citusdata.role=Master"
+    environment: &AUTH
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      PGUSER: "${POSTGRES_USER}"
+      PGPASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+
+  worker:
+    image: "citusdata/citus:12.1.3"
+    labels:
+      - "com.citusdata.role=Worker"
+    depends_on:
+      - manager
+    environment: *AUTH
+    deploy:
+      replicas: 3
+    command: "/wait-for-manager.sh"
+    volumes:
+      - healthcheck-volume:/healthcheck
+
+  manager:
+    image: "citusdata/membership-manager:0.3.0"
+    volumes:
+      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
+      - healthcheck-volume:/healthcheck
+    depends_on:
+      - coordinator
+    environment: *AUTH
+
+volumes:
+  healthcheck-volume:

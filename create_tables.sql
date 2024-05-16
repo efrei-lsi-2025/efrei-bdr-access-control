@@ -7,16 +7,19 @@ DROP TABLE IF EXISTS Gate;
 DROP TABLE IF EXISTS Building;
 DROP TABLE IF EXISTS Person;
 
+CREATE TYPE Region AS ENUM ('EU', 'US');
+
 CREATE TABLE IF NOT EXISTS Person (
     badgeId UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    region VARCHAR(255) NOT NULL
+    region Region NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Building (
     buildingId UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    address VARCHAR(511) NOT NULL
+    address VARCHAR(511) NOT NULL,
+    region Region NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Gate (
