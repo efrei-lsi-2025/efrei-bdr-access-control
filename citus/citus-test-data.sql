@@ -1,6 +1,6 @@
-INSERT INTO Building (buildingId, name, address) VALUES (gen_random_uuid(), 'Building 1', 'Address 1');
+INSERT INTO Building (buildingId, name, address,region) VALUES (gen_random_uuid(), 'Building 1', 'Address 1', 'EU');
 
-INSERT INTO Person (badgeid, name) VALUES (gen_random_uuid(), 'Alice');
+INSERT INTO Person (badgeid, name, region) VALUES (gen_random_uuid(), 'Alice', 'EU');
 
 INSERT INTO Gate (gateId) VALUES (gen_random_uuid());
 

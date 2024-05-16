@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS Gate;
 DROP TABLE IF EXISTS Building;
 DROP TABLE IF EXISTS Person;
 
-DROP TYPE IF EXISTS Region;
+DROP TYPE IF EXISTS Region CASCADE;
 CREATE TYPE Region AS ENUM ('EU', 'US');
 
 CREATE TABLE IF NOT EXISTS Person (
@@ -66,11 +66,12 @@ ALTER TABLE AccessRight ADD FOREIGN KEY (gateGroupId) REFERENCES GateGroup(gateG
 ALTER TABLE AccessRight ADD FOREIGN KEY (badgeId) REFERENCES Person(badgeId);
 
 CREATE TABLE IF NOT EXISTS AccessLog (
-    accessLogId UUID PRIMARY KEY,
+    accessLogId UUID,
     badgeId UUID NOT NULL,
     gateId UUID NOT NULL,
     accessTime TIMESTAMP NOT NULL,
-    success BOOLEAN NOT NULL
+    success BOOLEAN NOT NULL,
+    PRIMARY KEY (accessLogId, badgeId)
 );
 
 SELECT create_distributed_table('accesslog', 'accesslogid');
