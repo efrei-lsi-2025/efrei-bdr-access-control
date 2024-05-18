@@ -56,3 +56,35 @@ SELECT * FROM eu_remote.gatetogategroup;
 
 SELECT * FROM us_remote.gate;
 SELECT * FROM us_remote.gatetogategroup;
+
+-- Access Right
+
+INSERT INTO distributed.accessright_view(badgeid, gategroupid, expirationdate)
+VALUES (
+        (SELECT badgeid FROM distributed.person_view WHERE name = 'Antoine'),
+        (SELECT gategroupid FROM distributed.gategroup_view WHERE name = 'Campus'),
+        '2022-12-31'
+);
+
+INSERT INTO distributed.accessright_view(badgeid, gategroupid, expirationdate)
+VALUES (
+        (SELECT badgeid FROM distributed.person_view WHERE name = 'Thibaut'),
+        (SELECT gategroupid FROM distributed.gategroup_view WHERE name = 'Office'),
+        '2022-12-31'
+);
+
+INSERT INTO distributed.accessright_view(badgeid, gategroupid, expirationdate)
+VALUES (
+        (SELECT badgeid FROM distributed.person_view WHERE name = 'Antoine'),
+        (SELECT gategroupid FROM distributed.gategroup_view WHERE name = 'Office'),
+        '2022-12-31'
+);
+
+SELECT * FROM distributed.accessright_view;
+
+SELECT * FROM eu_remote.accessright;
+SELECT * FROM us_remote.accessright;
+
+-- Presence Log
+
+INSERT INTO distributed.presencelog_view(
