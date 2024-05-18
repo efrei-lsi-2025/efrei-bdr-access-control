@@ -6,8 +6,10 @@ DROP TABLE IF EXISTS GateGroup;
 DROP TABLE IF EXISTS Gate;
 DROP TABLE IF EXISTS Building;
 DROP TABLE IF EXISTS Person;
-
 DROP TYPE IF EXISTS Region CASCADE;
+
+SET citus.shard_replication_factor = 2;
+
 CREATE TYPE Region AS ENUM ('EU', 'US');
 
 CREATE TABLE IF NOT EXISTS Person (
