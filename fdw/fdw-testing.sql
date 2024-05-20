@@ -86,5 +86,3 @@ SELECT * FROM eu_remote.accessright;
 SELECT * FROM us_remote.accessright;
 
 -- Presence Log
-
-INSERT INTO distributed.presencelog_view(

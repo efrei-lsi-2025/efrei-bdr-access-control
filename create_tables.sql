@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS Person;
 DROP TYPE IF EXISTS Region CASCADE;
 
 SET citus.shard_replication_factor = 2;
+SET citus.enable_repartition_joins = on;
 
 CREATE TYPE Region AS ENUM ('EU', 'US');
 
@@ -64,8 +65,9 @@ CREATE TABLE IF NOT EXISTS AccessRight (
 
 SELECT create_distributed_table('accessright', 'badgeid', colocate_with => 'person');
 
-ALTER TABLE AccessRight ADD FOREIGN KEY (gateGroupId) REFERENCES GateGroup(gateGroupId);
-ALTER TABLE AccessRight ADD FOREIGN KEY (badgeId) REFERENCES Person(badgeId);
+-- Only if replication factor is 1:
+-- ALTER TABLE AccessRight ADD FOREIGN KEY (gateGroupId) REFERENCES GateGroup(gateGroupId);
+-- ALTER TABLE AccessRight ADD FOREIGN KEY (badgeId) REFERENCES Person(badgeId);
 
 CREATE TABLE IF NOT EXISTS AccessLog (
     accessLogId UUID,
