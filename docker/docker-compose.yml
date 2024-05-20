@@ -8,6 +8,8 @@ services:
       - 5432:5432
     labels:
       - "com.citusdata.role=Master"
+    volumes:
+      - ../scripts:/docker-entrypoint-initdb.d
     environment: &AUTH
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
@@ -15,20 +17,45 @@ services:
       PGPASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
 
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    labels:
-      - "com.citusdata.role=Worker"
+  worker-1:
+    extends:
+      file: worker.yml
+      service: worker
     depends_on:
       - manager
     environment: *AUTH
-    deploy:
-      replicas: 4
-    command: "/wait-for-manager.sh"
     volumes:
-      - healthcheck-volume:/healthcheck
+      - worker-1:/var/lib/postgresql/data
+
+  worker-2:
+    extends:
+      file: worker.yml
+      service: worker
+    depends_on:
+      - manager
+    environment: *AUTH
+    volumes:
+      - worker-1:/var/lib/postgresql/data
+
+  worker-3:
+    extends:
+      file: worker.yml
+      service: worker
+    depends_on:
+      - manager
+    environment: *AUTH
+    volumes:
+      - worker-1:/var/lib/postgresql/data
+
+  worker-4:
+    extends:
+      file: worker.yml
+      service: worker
+    depends_on:
+      - manager
+    environment: *AUTH
+    volumes:
+      - worker-1:/var/lib/postgresql/data
 
   manager:
     container_name: "${COMPOSE_PROJECT_NAME:-citus}_manager"
@@ -40,5 +67,17 @@ services:
       - master
     environment: *AUTH
 
+  doku:
+    image: "amerkurev/doku"
+    volumes:
+      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
+      - "/:/hostroot:ro"
+    ports:
+      - "9090:9090"
+
 volumes:
   healthcheck-volume:
+  worker-1:
+  worker-2:
+  worker-3:
+  worker-4:

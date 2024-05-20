@@ -1,4 +1,4 @@
--- Extra functions for the business.sql logic
+-- Extra functions for the 4-business.sql logic
 
 -- Function to compute if a certain badgeid has access to a certain gateid
 CREATE OR REPLACE FUNCTION distributed.check_access(p_badgeid text, p_gateid text) RETURNS BOOLEAN AS $$

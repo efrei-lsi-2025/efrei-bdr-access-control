@@ -1,0 +1,10 @@
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    labels:
+      - "com.citusdata.role=Worker"
+    command: "/wait-for-manager.sh"
+    volumes:
+      - healthcheck-volume:/healthcheck
