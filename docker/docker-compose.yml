@@ -8,8 +8,8 @@ services:
       - 5432:5432
     labels:
       - "com.citusdata.role=Master"
-    volumes:
-      - ../scripts:/docker-entrypoint-initdb.d
+    #     volumes:
+    #       - ../scripts:/docker-entrypoint-initdb.d
     environment: &AUTH
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
