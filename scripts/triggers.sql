@@ -1,56 +1,4 @@
-DROP EXTENSION IF EXISTS postgres_fdw CASCADE;
-CREATE EXTENSION postgres_fdw;
-
--- Create FDW connection
-
-DROP SERVER IF EXISTS "eu" CASCADE;
-DROP SERVER IF EXISTS "us" CASCADE;
-
-CREATE SERVER "eu"
-FOREIGN DATA WRAPPER postgres_fdw
-OPTIONS (host 'bdr-eu-1.epsilon', dbname 'postgres', port '5432');
-
-CREATE SERVER "us"
-FOREIGN DATA WRAPPER postgres_fdw
-OPTIONS (host 'bdr-us-1.epsilon', dbname 'postgres', port '5432');
-
-CREATE USER MAPPING FOR postgres
-SERVER "eu"
-OPTIONS (user 'postgres', password 'postgres');
-
-CREATE USER MAPPING FOR postgres
-SERVER "us"
-OPTIONS (user 'postgres', password 'postgres');
-
--- Import schema
-
-DROP SCHEMA IF EXISTS eu_remote CASCADE;
-DROP SCHEMA IF EXISTS us_remote CASCADE;
-
-CREATE SCHEMA eu_remote;
-CREATE SCHEMA us_remote;
-
-IMPORT FOREIGN SCHEMA public
-LIMIT TO (accesslog, accessright, building, gate, gategroup, gatetogategroup, person, presencelog, region)
-FROM SERVER "eu" INTO eu_remote;
-
-IMPORT FOREIGN SCHEMA public
-LIMIT TO (accesslog, accessright, building, gate, gategroup, gatetogategroup, person, presencelog, region)
-FROM SERVER "us" INTO us_remote;
-
--- Distributed views
-
-DROP SCHEMA IF EXISTS distributed CASCADE;
-CREATE SCHEMA distributed;
-
 -- Person
-
-CREATE OR REPLACE VIEW distributed.person_view AS
-    SELECT badgeId, name, region
-    FROM us_remote.person
-UNION ALL
-    SELECT badgeId, name, region
-    FROM eu_remote.person;
 
 -- TODO: GDPR?
 
@@ -111,12 +59,6 @@ FOR EACH ROW EXECUTE FUNCTION distributed.delete_person();
 
 -- Building
 
-CREATE OR REPLACE VIEW distributed.building_view AS
-    SELECT buildingId, name, address, region
-    FROM us_remote.building
-UNION ALL
-    SELECT buildingId, name, address, region
-    FROM eu_remote.building;
 
 CREATE OR REPLACE FUNCTION distributed.insert_building() RETURNS TRIGGER AS $$
 BEGIN
@@ -306,25 +248,6 @@ FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_gategroup();
 
 -- Gate
-
-CREATE OR REPLACE VIEW distributed.gate_view AS
-    SELECT gateid
-    FROM us_remote.gate
-UNION ALL
-    SELECT gateId
-    FROM eu_remote.gate;
-
--- Creating a view for inserts of new gates through the distributed.create_gate_and_gatetogategroup function below
-
-CREATE OR REPLACE VIEW distributed.gate_and_gatetogategroup_view AS
-    SELECT gate.gateId, gatetogategroup.gateGroupId, gatetogategroup.direction
-    FROM us_remote.gate
-    JOIN us_remote.gatetogategroup ON us_remote.gate.gateId = us_remote.gatetogategroup.gateId
-UNION ALL
-    SELECT gate.gateId, gatetogategroup.gateGroupId, gatetogategroup.direction
-    FROM eu_remote.gate
-    JOIN eu_remote.gatetogategroup ON eu_remote.gate.gateId = eu_remote.gatetogategroup.gateId;
-
 CREATE OR REPLACE FUNCTION distributed.insert_gate_and_gatetogategroup_trigger() RETURNS TRIGGER AS $$
 DECLARE
     building_region Region;
@@ -444,13 +367,6 @@ EXECUTE FUNCTION distributed.delete_gate_and_gatetogategroup_trigger();
 
 -- Access Right
 
-CREATE OR REPLACE VIEW distributed.accessright_view AS
-    SELECT gateGroupId, badgeId, expirationDate
-    FROM us_remote.accessright
-UNION ALL
-    SELECT gateGroupId, badgeId, expirationDate
-    FROM eu_remote.accessright;
-
 CREATE OR REPLACE FUNCTION distributed.insert_accessright() RETURNS TRIGGER AS $$
 DECLARE
     person_region Region;
@@ -522,13 +438,6 @@ EXECUTE FUNCTION distributed.delete_accessright();
 
 -- Access Log
 
-CREATE OR REPLACE VIEW distributed.accesslog_view AS
-    SELECT accesslogid, gateId, badgeId, accessTime
-    FROM us_remote.accesslog
-UNION ALL
-    SELECT accesslogid, gateId, badgeId, accessTime
-    FROM eu_remote.accesslog;
-
 CREATE OR REPLACE FUNCTION distributed.insert_accesslog() RETURNS TRIGGER AS $$
 DECLARE
     person_region Region;
@@ -578,13 +487,6 @@ FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_accesslog();
 
 -- Presence Log
-
-CREATE OR REPLACE VIEW distributed.presencelog_view AS
-    SELECT presencelogid, badgeid, entranceaccesslogid, exitaccesslogid, gategroupid, elapsedtime
-    FROM us_remote.presencelog
-UNION ALL
-    SELECT presencelogid, badgeid, entranceaccesslogid, exitaccesslogid, gategroupid, elapsedtime
-    FROM eu_remote.presencelog;
 
 CREATE OR REPLACE FUNCTION distributed.insert_presencelog() RETURNS TRIGGER AS $$
 DECLARE
@@ -660,139 +562,3 @@ CREATE TRIGGER instead_of_delete_presencelog
 INSTEAD OF DELETE ON distributed.presencelog_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_presencelog();
-
--- Extra functions for the business logic
-
--- Function to compute if a certain badgeid has access to a certain gateid
-
-CREATE OR REPLACE FUNCTION distributed.check_access(p_badgeid text, p_gateid text) RETURNS BOOLEAN AS $$
-DECLARE
-    person_region Region;
-    access BOOLEAN;
-BEGIN
-    -- Get the person's region
-    SELECT region INTO person_region FROM distributed.person_view WHERE badgeId = p_badgeid::uuid;
-
-    IF person_region = 'US'::region THEN
-        SELECT EXISTS (
-            SELECT 1
-            FROM us_remote.accessright
-            JOIN us_remote.gategroup ON us_remote.accessright.gateGroupId = us_remote.gategroup.gateGroupId
-            JOIN us_remote.gatetogategroup ON us_remote.gategroup.gateGroupId = us_remote.gatetogategroup.gateGroupId
-            WHERE us_remote.accessright.badgeId = p_badgeid::uuid
-              AND us_remote.gatetogategroup.gateId = p_gateid::uuid
-              AND us_remote.accessright.expirationDate > now()
-        ) INTO access;
-    ELSIF person_region = 'EU'::region THEN
-        SELECT EXISTS (
-            SELECT 1
-            FROM eu_remote.accessright
-            JOIN eu_remote.gategroup ON eu_remote.accessright.gateGroupId = eu_remote.gategroup.gateGroupId
-            JOIN eu_remote.gatetogategroup ON eu_remote.gategroup.gateGroupId = eu_remote.gatetogategroup.gateGroupId
-            WHERE eu_remote.accessright.badgeId = p_badgeid::uuid
-              AND eu_remote.gatetogategroup.gateId = p_gateid::uuid
-              AND eu_remote.accessright.expirationDate > now()
-        ) INTO access;
-    ELSE
-        RAISE EXCEPTION 'Person not found or invalid region: %', p_badgeid;
-    END IF;
-
-    RETURN access;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to simulate a person entering/exiting a building
-
-CREATE OR REPLACE FUNCTION distributed.enter_building(p_badgeid text, p_gateid text) RETURNS VOID AS $$
-DECLARE
-    d_person_region Region;
-    d_access BOOLEAN;
-    d_gate_direction BOOLEAN;
-    d_newlogid UUID;
-    d_presencelogid UUID;
-    d_entrancelogid UUID;
-BEGIN
-    -- Get the person's region
-    SELECT region INTO d_person_region FROM distributed.person_view WHERE badgeId = p_badgeid::uuid;
-
-    IF d_person_region = 'US'::region THEN
-        SELECT distributed.check_access(p_badgeid, p_gateid) INTO d_access;
-
-        IF d_access THEN
-            SELECT direction INTO d_gate_direction
-            FROM us_remote.gatetogategroup
-            WHERE gateId = p_gateid::uuid;
-
-            INSERT INTO us_remote.accesslog (accesslogid, gateId, badgeId, accessTime, success)
-            VALUES (gen_random_uuid(), p_gateid::uuid, p_badgeid::uuid, now(), true)
-            RETURNING accesslogid INTO d_newlogid;
-
-            IF d_gate_direction THEN
-                INSERT INTO us_remote.presencelog (presencelogid, badgeid, entranceaccesslogid, gategroupid)
-                VALUES (gen_random_uuid(), p_badgeid::uuid, d_newlogid, (SELECT gateGroupId FROM us_remote.gatetogategroup WHERE gateId = p_gateid::uuid));
-            ELSE
-                WITH gategroupId AS (
-                    SELECT gateGroupId
-                    FROM us_remote.gatetogategroup
-                    WHERE gateId = p_gateid::uuid
-                    LIMIT 1
-                )
-                SELECT presencelogid, entranceaccesslogid INTO d_presencelogid, d_entrancelogid
-                FROM distributed.presencelog_view
-                WHERE badgeid = p_badgeid::uuid
-                  AND gategroupid = (SELECT gateGroupId FROM gategroupId)
-                  AND exitaccesslogid IS NULL
-                LIMIT 1;
-
-                UPDATE distributed.presencelog_view
-                SET exitaccesslogid = d_newlogid, elapsedtime = now() - (SELECT accessTime FROM distributed.accesslog_view WHERE accesslogid = d_entrancelogid)
-                WHERE presencelogid = d_presencelogid;
-            END IF;
-        ELSE
-            INSERT INTO us_remote.accesslog (accesslogid, gateId, badgeId, accessTime, success)
-            VALUES (gen_random_uuid(), p_gateid::uuid, p_badgeid::uuid, now(), false);
-            RAISE EXCEPTION 'Access denied';
-        END IF;
-    ELSIF d_person_region = 'EU'::region THEN
-        SELECT distributed.check_access(p_badgeid, p_gateid) INTO d_access;
-
-        IF d_access THEN
-            SELECT direction INTO d_gate_direction
-            FROM eu_remote.gatetogategroup
-            WHERE gateId = p_gateid::uuid;
-
-            INSERT INTO eu_remote.accesslog (accesslogid, gateId, badgeId, accessTime, success)
-            VALUES (gen_random_uuid(), p_gateid::uuid, p_badgeid::uuid, now(), true)
-            RETURNING accesslogid INTO d_newlogid;
-
-            IF d_gate_direction THEN
-                INSERT INTO eu_remote.presencelog (presencelogid, badgeid, entranceaccesslogid, gategroupid)
-                VALUES (gen_random_uuid(), p_badgeid::uuid, d_newlogid, (SELECT gateGroupId FROM eu_remote.gatetogategroup WHERE gateId = p_gateid::uuid));
-            ELSE
-                WITH gategroupId AS (
-                    SELECT gateGroupId
-                    FROM eu_remote.gatetogategroup
-                    WHERE gateId = p_gateid::uuid
-                    LIMIT 1
-                )
-                SELECT presencelogid, entranceaccesslogid INTO d_presencelogid, d_entrancelogid
-                FROM distributed.presencelog_view
-                WHERE badgeid = p_badgeid::uuid
-                  AND gategroupid = (SELECT gateGroupId FROM gategroupId)
-                  AND exitaccesslogid IS NULL
-                LIMIT 1;
-
-                UPDATE distributed.presencelog_view
-                SET exitaccesslogid = d_newlogid, elapsedtime = now() - (SELECT accessTime FROM eu_remote.accesslog WHERE accesslogid = d_entrancelogid)
-                WHERE presencelogid = d_presencelogid;
-            END IF;
-        ELSE
-            INSERT INTO eu_remote.accesslog (accesslogid, gateId, badgeId, accessTime, success)
-            VALUES (gen_random_uuid(), p_gateid::uuid, p_badgeid::uuid, now(), false);
-            RAISE EXCEPTION 'Access denied';
-        END IF;
-    ELSE
-        RAISE EXCEPTION 'Person not found or invalid region: %', p_badgeid;
-    END IF;
-END;
-$$ LANGUAGE plpgsql;
