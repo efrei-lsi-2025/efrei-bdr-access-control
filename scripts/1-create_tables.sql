@@ -8,7 +8,7 @@ DROP TABLE IF EXISTS Building;
 DROP TABLE IF EXISTS Person;
 DROP TYPE IF EXISTS Region CASCADE;
 
-SET citus.shard_replication_factor = 2;
+-- SET citus.shard_replication_factor = 2;
 SET citus.enable_repartition_joins = on;
 
 CREATE TYPE Region AS ENUM ('EU', 'US');
