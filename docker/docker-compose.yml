@@ -1,7 +1,9 @@
 services:
   master:
     container_name: "${COMPOSE_PROJECT_NAME:-citus}_master"
-    image: "citusdata/citus:12.1.3"
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - 5432:5432
     labels:
@@ -14,7 +16,9 @@ services:
       POSTGRES_HOST_AUTH_METHOD: "trust"
 
   worker:
-    image: "citusdata/citus:12.1.3"
+    build:
+      context: .
+      dockerfile: Dockerfile
     labels:
       - "com.citusdata.role=Worker"
     depends_on:

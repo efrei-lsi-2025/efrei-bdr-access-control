@@ -190,7 +190,9 @@ if (values.accessright) {
     return {
       badgeid: person.badgeid,
       gategroupid: randomGategroup.gategroupid,
-      expirationdate: faker.date.future(),
+      expirationdate: faker.date.future({
+        years: 1,
+      }),
     };
   });
 
@@ -219,10 +221,8 @@ if (values.simulation) {
   console.log(`Fetched ${persons.length} persons`);
 
   const gateGroupGates = await sql`
-    SELECT gategroupgates.gategroupid, gate.gateid, gategroupgates.direction
-    FROM distributed.gate_and_gatetogategroup_view AS gategroupgates
-    INNER JOIN distributed.gate_view AS gate
-      ON gategroupgates.gateid = gate.gateid`;
+    SELECT gategroupid, gateid, direction
+    FROM distributed.gate_and_gatetogategroup_view`;
 
   console.log(`Fetched ${gateGroupGates.length} gategroupgates`);
 
@@ -263,6 +263,5 @@ if (values.simulation) {
     console.log(simulations[i]);
     await sql`SELECT distributed.enter_building(${simulations[i].badgeid}, ${simulations[i].gateid})`;
     console.log(`Inserted ${i + 1}/${simulations.length} simulations`);
-    await new Promise((resolve) => setTimeout(resolve, 5));
   }
 }
