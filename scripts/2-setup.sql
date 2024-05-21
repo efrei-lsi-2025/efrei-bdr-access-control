@@ -31,11 +31,11 @@ CREATE SCHEMA eu_remote;
 CREATE SCHEMA us_remote;
 
 IMPORT FOREIGN SCHEMA public
-LIMIT TO (accesslog, accessright, building, gate, gategroup, gatetogategroup, person, presencelog, region)
+LIMIT TO (accesslog, accessright, building, gate, gategroup, gatetogategroup, person, presencelog, region, dblogs)
 FROM SERVER "eu" INTO eu_remote;
 
 IMPORT FOREIGN SCHEMA public
-LIMIT TO (accesslog, accessright, building, gate, gategroup, gatetogategroup, person, presencelog, region)
+LIMIT TO (accesslog, accessright, building, gate, gategroup, gatetogategroup, person, presencelog, region, dblogs)
 FROM SERVER "us" INTO us_remote;
 
 -- Distributed views

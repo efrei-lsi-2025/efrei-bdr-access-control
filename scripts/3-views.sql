@@ -63,3 +63,11 @@ CREATE OR REPLACE VIEW distributed.presencelog_view AS
 UNION ALL
     SELECT presencelogid, badgeid, entranceaccesslogid, exitaccesslogid, gategroupid, elapsedtime
     FROM eu_remote.presencelog;
+
+-- Database Log
+CREATE OR REPLACE VIEW distributed.dblogs_view AS
+    SELECT logId, operationTime, userName, operationType, objectName, objectId
+    FROM us_remote.dblogs
+UNION ALL
+    SELECT logId, operationTime, userName, operationType, objectName, objectId
+    FROM eu_remote.dblogs;
