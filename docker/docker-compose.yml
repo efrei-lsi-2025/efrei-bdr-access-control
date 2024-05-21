@@ -8,8 +8,6 @@ services:
       - 5432:5432
     labels:
       - "com.citusdata.role=Master"
-    #     volumes:
-    #       - ../scripts:/docker-entrypoint-initdb.d
     environment: &AUTH
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
@@ -35,7 +33,7 @@ services:
       - manager
     environment: *AUTH
     volumes:
-      - worker-1:/var/lib/postgresql/data
+      - worker-2:/var/lib/postgresql/data
 
   worker-3:
     extends:
@@ -45,7 +43,7 @@ services:
       - manager
     environment: *AUTH
     volumes:
-      - worker-1:/var/lib/postgresql/data
+      - worker-3:/var/lib/postgresql/data
 
   worker-4:
     extends:
@@ -55,11 +53,11 @@ services:
       - manager
     environment: *AUTH
     volumes:
-      - worker-1:/var/lib/postgresql/data
+      - worker-4:/var/lib/postgresql/data
 
   manager:
     container_name: "${COMPOSE_PROJECT_NAME:-citus}_manager"
-    image: "jiveoff/membership-manager:latest"
+    image: "citusdata/membership-manager:0.3.0"
     volumes:
       - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
       - healthcheck-volume:/healthcheck
