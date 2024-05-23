@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS GateGroup;
 DROP TABLE IF EXISTS Gate;
 DROP TABLE IF EXISTS Building;
 DROP TABLE IF EXISTS Person;
+DROP TABLE IF EXISTS DbLogs;
 DROP TYPE IF EXISTS Region CASCADE;
 
 -- SET citus.shard_replication_factor = 2;
@@ -90,3 +91,14 @@ CREATE TABLE IF NOT EXISTS PresenceLog (
 );
 
 SELECT create_distributed_table('presencelog', 'presencelogid');
+
+CREATE TABLE IF NOT EXISTS DbLogs (
+    logId UUID PRIMARY KEY,
+    operationTime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    userName TEXT NOT NULL,
+    operationType TEXT NOT NULL,
+    objectName TEXT NOT NULL,
+    objectId TEXT NOT NULL
+);
+
+SELECT create_distributed_table('dblogs', 'logid');
