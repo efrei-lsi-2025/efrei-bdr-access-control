@@ -1,9 +1,7 @@
 services:
   master:
     container_name: "${COMPOSE_PROJECT_NAME:-citus}_master"
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: "citusdata/citus:12.1.3"
     ports:
       - 5432:5432
     labels:
