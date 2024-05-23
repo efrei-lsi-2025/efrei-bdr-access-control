@@ -190,9 +190,7 @@ if (values.accessright) {
     return {
       badgeid: person.badgeid,
       gategroupid: randomGategroup.gategroupid,
-      expirationdate: faker.date.future({
-        years: 1,
-      }),
+      expirationdate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     };
   });
 
