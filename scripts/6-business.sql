@@ -89,7 +89,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to simulate a person entering/exiting a building
+-- Function to simulate a person entering/exiting a workspace
 CREATE OR REPLACE FUNCTION distributed.enter_workspace(p_badgeid text, p_gateid text) RETURNS VOID AS $$
 DECLARE
     d_person_region Region;
@@ -142,7 +142,7 @@ BEGIN
             END LOOP;
 
         ELSE
-            RAISE EXCEPTION 'Access denied';
+            RAISE NOTICE 'Access denied';
         END IF;
     ELSIF d_person_region = 'EU'::region THEN
         SELECT distributed.check_access(p_badgeid, p_gateid) INTO d_access;
@@ -182,7 +182,7 @@ BEGIN
                 END IF;
             END LOOP;
         ELSE
-            RAISE EXCEPTION 'Access denied';
+            RAISE NOTICE 'Access denied';
         END IF;
     ELSE
         RAISE EXCEPTION 'Person not found or invalid region: %', p_badgeid;
