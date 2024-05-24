@@ -9,14 +9,13 @@ DROP TABLE IF EXISTS Person;
 DROP TABLE IF EXISTS DbLogs;
 DROP TYPE IF EXISTS Region CASCADE;
 
--- SET citus.shard_replication_factor = 2;
+SET citus.shard_replication_factor = 2;
 SET citus.enable_repartition_joins = on;
 
 CREATE TYPE Region AS ENUM ('EU', 'US');
 
 CREATE TABLE IF NOT EXISTS Person (
     badgeId UUID PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
     region Region NOT NULL
 );
 
@@ -94,7 +93,7 @@ SELECT create_distributed_table('presencelog', 'presencelogid');
 
 CREATE TABLE IF NOT EXISTS DbLogs (
     logId UUID PRIMARY KEY,
-    operationTime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    operationTime TIMESTAMP,
     userName TEXT NOT NULL,
     operationType TEXT NOT NULL,
     objectName TEXT NOT NULL,

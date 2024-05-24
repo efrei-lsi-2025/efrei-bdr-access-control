@@ -1,14 +1,14 @@
 -- Function to log operations
-CREATE OR REPLACE FUNCTION distributed.log(region region, operationType TEXT, objectName TEXT, objectId TEXT) RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION distributed.log(p_region region, p_operationType TEXT, p_objectName TEXT, p_objectId TEXT) RETURNS VOID AS $$
 BEGIN
-    IF (region = 'US'::region) THEN
+    IF (p_region = 'US'::region) THEN
         INSERT INTO us_remote.dblogs (logId, userName, operationType, objectName, objectId)
-        VALUES (gen_random_uuid(), CURRENT_USER, operationType, objectName, objectId);
-    ELSIF (region = 'EU'::region) THEN
+        VALUES (gen_random_uuid(), CURRENT_USER, p_operationType, p_objectName, p_objectId);
+    ELSIF (p_region = 'EU'::region) THEN
         INSERT INTO eu_remote.dblogs (logId, userName, operationType, objectName, objectId)
-        VALUES (gen_random_uuid(), CURRENT_USER, operationType, objectName, objectId);
+        VALUES (gen_random_uuid(), CURRENT_USER, p_operationType, p_objectName, p_objectId);
     ELSE
-        RAISE EXCEPTION 'Invalid region: %', region;
+        RAISE EXCEPTION 'Invalid region: %', p_region;
     END IF;
 END;
 $$ LANGUAGE plpgsql;
@@ -18,33 +18,14 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION distributed.insert_person() RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.region = 'US'::region THEN
-        INSERT INTO us_remote.person (badgeId, name, region) VALUES (NEW.badgeId, NEW.name, NEW.region::region);
+        INSERT INTO us_remote.person (badgeId, region) VALUES (NEW.badgeId, NEW.region::region);
     ELSIF NEW.region = 'EU'::region THEN
-        INSERT INTO eu_remote.person (badgeId, name, region) VALUES (NEW.badgeId, NEW.name, NEW.region::region);
+        INSERT INTO eu_remote.person (badgeId, region) VALUES (NEW.badgeId, NEW.region::region);
     ELSE
         RAISE EXCEPTION 'Invalid region: %', NEW.region;
     END IF;
 
-    SELECT distributed.log(NEW.region, 'INSERT', 'person', NEW.badgeId);
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION distributed.update_person() RETURNS TRIGGER AS $$
-BEGIN
-    IF OLD.region <> NEW.region THEN
-        RAISE EXCEPTION 'Region cannot be changed';
-    END IF;
-
-    IF NEW.region = 'US'::region THEN
-        UPDATE us_remote.person SET name = NEW.name WHERE badgeId = NEW.badgeId;
-    ELSIF NEW.region = 'EU'::region THEN
-        UPDATE eu_remote.person SET name = NEW.name WHERE badgeId = NEW.badgeId;
-    ELSE
-        RAISE EXCEPTION 'Invalid region: %', NEW.region;
-    END IF;
-
-    SELECT distributed.log(NEW.region, 'UPDATE', 'person', NEW.badgeId);
+    PERFORM distributed.log(NEW.region, 'INSERT', 'person', NEW.badgeId::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -59,7 +40,7 @@ BEGIN
         RAISE EXCEPTION 'Invalid region: %', OLD.region;
     END IF;
 
-    SELECT distributed.log(OLD.region, 'DELETE', 'person', OLD.badgeId);
+    PERFORM distributed.log(OLD.region, 'DELETE', 'person', OLD.badgeId::text);
     RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
@@ -67,10 +48,6 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER insert_person_trigger
 INSTEAD OF INSERT ON distributed.person_view
 FOR EACH ROW EXECUTE FUNCTION distributed.insert_person();
-
-CREATE OR REPLACE TRIGGER update_person_trigger
-INSTEAD OF UPDATE ON distributed.person_view
-FOR EACH ROW EXECUTE FUNCTION distributed.update_person();
 
 CREATE OR REPLACE TRIGGER delete_person_trigger
 INSTEAD OF DELETE ON distributed.person_view
@@ -88,7 +65,7 @@ BEGIN
         RAISE EXCEPTION 'Invalid region: %', NEW.region;
     END IF;
 
-    SELECT distributed.log(NEW.region, 'INSERT', 'building', NEW.buildingId);
+    PERFORM distributed.log(NEW.region, 'INSERT', 'building', NEW.buildingId::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -111,7 +88,7 @@ BEGIN
         RAISE EXCEPTION 'Invalid region: %', OLD.region;
     END IF;
 
-    SELECT distributed.log(NEW.region, 'UPDATE', 'building', NEW.buildingId);
+    PERFORM distributed.log(NEW.region, 'UPDATE', 'building', NEW.buildingId::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -126,22 +103,22 @@ BEGIN
         RAISE EXCEPTION 'Invalid region: %', OLD.region;
     END IF;
 
-    SELECT distributed.log(OLD.region, 'DELETE', 'building', OLD.buildingId);
+    PERFORM distributed.log(OLD.region, 'DELETE', 'building', OLD.buildingId::text);
     RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER instead_of_insert_building
+CREATE OR REPLACE TRIGGER instead_of_insert_building
 INSTEAD OF INSERT ON distributed.building_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.insert_building();
 
-CREATE TRIGGER instead_of_update_building
+CREATE OR REPLACE TRIGGER instead_of_update_building
 INSTEAD OF UPDATE ON distributed.building_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.update_building();
 
-CREATE TRIGGER instead_of_delete_building
+CREATE OR REPLACE TRIGGER instead_of_delete_building
 INSTEAD OF DELETE ON distributed.building_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_building();
@@ -170,7 +147,7 @@ BEGIN
             INSERT INTO eu_remote.gategroup (gateGroupId, name, buildingId) VALUES (NEW.gateGroupId, NEW.name, NEW.buildingId);
         END IF;
 
-        SELECT distributed.log(building_region, 'INSERT', 'gategroup', NEW.gateGroupId);
+        PERFORM distributed.log(building_region, 'INSERT', 'gategroup', NEW.gateGroupId::text);
     ELSE
         RAISE EXCEPTION 'Building not found or invalid region: %', NEW.buildingId;
     END IF;
@@ -215,7 +192,7 @@ BEGIN
             UPDATE eu_remote.gategroup SET name = NEW.name, buildingId = NEW.buildingId WHERE gateGroupId = OLD.gateGroupId;
         END IF;
 
-        SELECT distributed.log(old_building_region, 'UPDATE', 'gategroup', OLD.gateGroupId);
+        PERFORM distributed.log(old_building_region, 'UPDATE', 'gategroup', OLD.gateGroupId::text);
     ELSE
         RAISE EXCEPTION 'New building must be in the same region as the old building';
     END IF;
@@ -246,7 +223,7 @@ BEGIN
             DELETE FROM eu_remote.gategroup WHERE gateGroupId = OLD.gateGroupId;
         END IF;
 
-        SELECT distributed.log(building_region, 'DELETE', 'gategroup', OLD.gateGroupId);
+        PERFORM distributed.log(building_region, 'DELETE', 'gategroup', OLD.gateGroupId::text);
     ELSE
         RAISE EXCEPTION 'Building not found or invalid region: %', OLD.buildingId;
     END IF;
@@ -254,17 +231,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER instead_of_insert_gategroup
+CREATE OR REPLACE TRIGGER instead_of_insert_gategroup
 INSTEAD OF INSERT ON distributed.gategroup_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.insert_gategroup();
 
-CREATE TRIGGER instead_of_update_gategroup
+CREATE OR REPLACE TRIGGER instead_of_update_gategroup
 INSTEAD OF UPDATE ON distributed.gategroup_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.update_gategroup();
 
-CREATE TRIGGER instead_of_delete_gategroup
+CREATE OR REPLACE TRIGGER instead_of_delete_gategroup
 INSTEAD OF DELETE ON distributed.gategroup_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_gategroup();
@@ -304,7 +281,7 @@ BEGIN
             VALUES (gen_random_uuid(), NEW.gateId, NEW.gateGroupId, NEW.direction);
         END IF;
 
-        SELECT distributed.log(building_region, 'INSERT', 'gate', 'gateId: ' || NEW.gateId || ', gateGroupId: ' || NEW.gateGroupId);
+        PERFORM distributed.log(building_region, 'INSERT', 'gate', 'gateId: ' || NEW.gateId || ', gateGroupId: ' || NEW.gateGroupId);
     ELSE
         RAISE EXCEPTION 'Building not found or invalid region for gateGroupId: %', NEW.gateGroupId;
     END IF;
@@ -337,7 +314,7 @@ BEGIN
             UPDATE eu_remote.gatetogategroup SET direction = NEW.direction WHERE gateId = NEW.gateId AND gateGroupId = NEW.gateGroupId;
         END IF;
 
-        SELECT distributed.log(building_region, 'UPDATE', 'gate', 'gateId: ' || NEW.gateId || ', gateGroupId: ' || NEW.gateGroupId);
+        PERFORM distributed.log(building_region, 'UPDATE', 'gate', 'gateId: ' || NEW.gateId || ', gateGroupId: ' || NEW.gateGroupId);
     ELSE
         RAISE EXCEPTION 'Building not found or invalid region for gateGroupId: %', NEW.gateGroupId;
     END IF;
@@ -370,7 +347,7 @@ BEGIN
             DELETE FROM eu_remote.gatetogategroup WHERE gateId = OLD.gateId AND gateGroupId = OLD.gateGroupId;
         END IF;
 
-        SELECT distributed.log(building_region, 'DELETE', 'gate', 'gateId: ' || OLD.gateId || ', gateGroupId: ' || OLD.gateGroupId);
+        PERFORM distributed.log(building_region, 'DELETE', 'gate', 'gateId: ' || OLD.gateId || ', gateGroupId: ' || OLD.gateGroupId);
     ELSE
         RAISE EXCEPTION 'Building not found or invalid region for gateGroupId: %', OLD.gateGroupId;
     END IF;
@@ -378,17 +355,17 @@ BEGIN
 end;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER instead_of_insert_gate_and_gatetogategroup
+CREATE OR REPLACE TRIGGER instead_of_insert_gate_and_gatetogategroup
 INSTEAD OF INSERT ON distributed.gate_and_gatetogategroup_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.insert_gate_and_gatetogategroup_trigger();
 
-CREATE TRIGGER instead_of_update_gate_and_gatetogategroup
+CREATE OR REPLACE TRIGGER instead_of_update_gate_and_gatetogategroup
 INSTEAD OF UPDATE ON distributed.gate_and_gatetogategroup_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.update_gate_and_gatetogategroup_trigger();
 
-CREATE TRIGGER instead_of_delete_gate_and_gatetogategroup
+CREATE OR REPLACE TRIGGER instead_of_delete_gate_and_gatetogategroup
 INSTEAD OF DELETE ON distributed.gate_and_gatetogategroup_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_gate_and_gatetogategroup_trigger();
@@ -410,7 +387,7 @@ BEGIN
         RAISE EXCEPTION 'Person not found or invalid region: %', NEW.badgeId;
     END IF;
 
-    SELECT distributed.log(person_region, 'INSERT', 'accessright', 'badgeId: ' || NEW.badgeId || ', gateGroupId: ' || NEW.gateGroupId);
+    PERFORM distributed.log(person_region, 'INSERT', 'accessright', 'badgeId: ' || NEW.badgeId || ', gateGroupId: ' || NEW.gateGroupId);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -430,7 +407,7 @@ BEGIN
         RAISE EXCEPTION 'Person not found or invalid region: %', NEW.badgeId;
     END IF;
 
-    SELECT distributed.log(person_region, 'UPDATE', 'accessright', 'badgeId: ' || NEW.badgeId || ', gateGroupId: ' || NEW.gateGroupId);
+    PERFORM distributed.log(person_region, 'UPDATE', 'accessright', 'badgeId: ' || NEW.badgeId || ', gateGroupId: ' || NEW.gateGroupId);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -450,21 +427,21 @@ BEGIN
         RAISE EXCEPTION 'Person not found or invalid region: %', OLD.badgeId;
     END IF;
 
-    SELECT distributed.log(person_region, 'DELETE', 'accessright', 'badgeId: ' || OLD.badgeId || ', gateGroupId: ' || OLD.gateGroupId);
+    PERFORM distributed.log(person_region, 'DELETE', 'accessright', 'badgeId: ' || OLD.badgeId || ', gateGroupId: ' || OLD.gateGroupId);
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER instead_of_insert_accessright
+CREATE OR REPLACE TRIGGER instead_of_insert_accessright
 INSTEAD OF INSERT ON distributed.accessright_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.insert_accessright();
 
-CREATE TRIGGER instead_of_update_accessright
+CREATE OR REPLACE TRIGGER instead_of_update_accessright
 INSTEAD OF UPDATE ON distributed.accessright_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.update_accessright();
 
-CREATE TRIGGER instead_of_delete_accessright
+CREATE OR REPLACE TRIGGER instead_of_delete_accessright
 INSTEAD OF DELETE ON distributed.accessright_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_accessright();
@@ -488,7 +465,7 @@ BEGIN
         RAISE EXCEPTION 'Person not found or invalid region: %', NEW.badgeId;
     END IF;
 
-    SELECT distributed.log(person_region, 'INSERT', 'accesslog', NEW.accesslogid);
+    PERFORM distributed.log(person_region, 'INSERT', 'accesslog', NEW.accesslogid::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -508,17 +485,17 @@ BEGIN
         RAISE EXCEPTION 'Person not found or invalid region: %', OLD.badgeId;
     END IF;
 
-    SELECT distributed.log(person_region, 'DELETE', 'accesslog', OLD.accesslogid);
+    PERFORM distributed.log(person_region, 'DELETE', 'accesslog', OLD.accesslogid::text);
     RETURN OLD;
 end;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER instead_of_insert_accesslog
+CREATE OR REPLACE TRIGGER instead_of_insert_accesslog
 INSTEAD OF INSERT ON distributed.accesslog_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.insert_accesslog();
 
-CREATE TRIGGER instead_of_delete_accesslog
+CREATE OR REPLACE TRIGGER instead_of_delete_accesslog
 INSTEAD OF DELETE ON distributed.accesslog_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_accesslog();
@@ -541,7 +518,7 @@ BEGIN
         RAISE EXCEPTION 'Person not found or invalid region: %', NEW.badgeId;
     END IF;
 
-    SELECT distributed.log(person_region, 'INSERT', 'presencelog', NEW.presencelogid);
+    PERFORM distributed.log(person_region, 'INSERT', 'presencelog', NEW.presencelogid::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -565,7 +542,7 @@ BEGIN
         RAISE EXCEPTION 'Person not found or invalid region: %', NEW.badgeId;
     END IF;
 
-    SELECT distributed.log(person_region, 'UPDATE', 'presencelog', NEW.presencelogid);
+    PERFORM distributed.log(person_region, 'UPDATE', 'presencelog', NEW.presencelogid::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -585,22 +562,22 @@ BEGIN
         RAISE EXCEPTION 'Person not found or invalid region: %', OLD.badgeId;
     END IF;
 
-    SELECT distributed.log(person_region, 'DELETE', 'presencelog', OLD.presencelogid);
+    PERFORM distributed.log(person_region, 'DELETE', 'presencelog', OLD.presencelogid::text);
     RETURN OLD;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER instead_of_insert_presencelog
+CREATE OR REPLACE TRIGGER instead_of_insert_presencelog
 INSTEAD OF INSERT ON distributed.presencelog_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.insert_presencelog();
 
-CREATE TRIGGER instead_of_update_presencelog
+CREATE OR REPLACE TRIGGER instead_of_update_presencelog
 INSTEAD OF UPDATE ON distributed.presencelog_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.update_presencelog();
 
-CREATE TRIGGER instead_of_delete_presencelog
+CREATE OR REPLACE TRIGGER instead_of_delete_presencelog
 INSTEAD OF DELETE ON distributed.presencelog_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_presencelog();

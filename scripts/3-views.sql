@@ -1,9 +1,9 @@
 -- Person
 CREATE OR REPLACE VIEW distributed.person_view AS
-    SELECT badgeId, name, region
+    SELECT badgeId, region
     FROM us_remote.person
 UNION ALL
-    SELECT badgeId, name, region
+    SELECT badgeId, region
     FROM eu_remote.person;
 
 -- Building
