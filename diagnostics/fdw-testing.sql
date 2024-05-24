@@ -42,19 +42,19 @@ SELECT * FROM us_remote.gategroup;
 
 -- Gate
 
-INSERT INTO distributed.gate_and_gatetogategroup_view(gateid, gategroupid, direction)
+INSERT INTO distributed.gatetogategroup_view(gateid, gategroupid, direction)
 VALUES (gen_random_uuid(), (SELECT gategroupid FROM distributed.gategroup_view WHERE name = 'Campus'), true);
 
-INSERT INTO distributed.gate_and_gatetogategroup_view(gateid, gategroupid, direction)
+INSERT INTO distributed.gatetogategroup_view(gateid, gategroupid, direction)
 VALUES (gen_random_uuid(), (SELECT gategroupid FROM distributed.gategroup_view WHERE name = 'Campus'), false);
 
-INSERT INTO distributed.gate_and_gatetogategroup_view(gateid, gategroupid, direction)
+INSERT INTO distributed.gatetogategroup_view(gateid, gategroupid, direction)
 VALUES (gen_random_uuid(), (SELECT gategroupid FROM distributed.gategroup_view WHERE name = 'Office'), true);
 
-INSERT INTO distributed.gate_and_gatetogategroup_view(gateid, gategroupid, direction)
+INSERT INTO distributed.gatetogategroup_view(gateid, gategroupid, direction)
 VALUES (gen_random_uuid(), (SELECT gategroupid FROM distributed.gategroup_view WHERE name = 'Office'), false);
 
-SELECT * FROM distributed.gate_and_gatetogategroup_view;
+SELECT * FROM distributed.distributed.gatetogategroup_view;
 SELECT * FROM distributed.gate_view;
 
 SELECT * FROM eu_remote.gate;
@@ -86,13 +86,13 @@ SELECT * FROM us_remote.accessright;
 
 -- Building Access Simulation
 
-SELECT distributed.enter_building((SELECT badgeid FROM distributed.person_view WHERE name = 'Antoine')::text, (SELECT gateid FROM distributed.gate_and_gatetogategroup_view JOIN distributed.gategroup_view ON distributed.gategroup_view.gategroupid = distributed.gate_and_gatetogategroup_view.gategroupid WHERE name = 'Campus' AND direction = true LIMIT 1)::text);
-SELECT distributed.enter_building((SELECT badgeid FROM distributed.person_view WHERE name = 'Antoine')::text, (SELECT gateid FROM distributed.gate_and_gatetogategroup_view JOIN distributed.gategroup_view ON distributed.gategroup_view.gategroupid = distributed.gate_and_gatetogategroup_view.gategroupid WHERE name = 'Campus' AND direction = false LIMIT 1)::text);
+SELECT distributed.enter_workspace((SELECT badgeid FROM distributed.person_view WHERE name = 'Antoine')::text, (SELECT gateid FROM distributed.gatetogategroup_view JOIN distributed.gategroup_view ON distributed.gategroup_view.gategroupid = distributed.gatetogategroup_view.gategroupid WHERE name = 'Campus' AND direction = true LIMIT 1)::text);
+SELECT distributed.enter_workspace((SELECT badgeid FROM distributed.person_view WHERE name = 'Antoine')::text, (SELECT gateid FROM distributed.gatetogategroup_view JOIN distributed.gategroup_view ON distributed.gategroup_view.gategroupid = distributed.gatetogategroup_view.gategroupid WHERE name = 'Campus' AND direction = false LIMIT 1)::text);
 
 SELECT * FROM distributed.presencelog_view WHERE badgeid = (SELECT badgeid FROM distributed.person_view WHERE name = 'Antoine');
 
 --
 
 SELECT * FROM distributed.accessright_view
-         WHERE gategroupid = (SELECT gategroupid FROM distributed.gate_and_gatetogategroup_view WHERE gateid = 'e92300b2-c54c-4727-b4db-b660a5ff6a5f')
+         WHERE gategroupid = (SELECT gategroupid FROM distributed.gatetogategroup_view WHERE gateid = 'e92300b2-c54c-4727-b4db-b660a5ff6a5f')
             AND badgeid = '04aefbfe-6e08-44ad-9566-e55fc009e316';

@@ -1,3 +1,3 @@
-EXPLAIN ANALYZE SELECT * FROM distributed.person_view WHERE region = 'US';
+SELECT * FROM distributed.person_view;
 
-EXPLAIN ANALYSE SELECT * FROM distributed.gate_and_gatetogategroup_view;
+EXPLAIN ANALYSE VERBOSE SELECT * FROM distributed.person_view;

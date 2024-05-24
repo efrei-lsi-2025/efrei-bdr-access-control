@@ -50,7 +50,6 @@ if (values.person) {
 
   const personRecords = Array.from({ length: Number(values.person) }, () => ({
     badgeid: crypto.randomUUID(),
-    name: faker.person.firstName(),
     region: faker.helpers.arrayElement(["EU", "US"]),
   }));
 
@@ -91,8 +90,7 @@ if (values.building) {
       buildingRecords.slice(i, i + batchSize)
     )}`;
     console.log(
-      `Inserted ${i + recordsToInsert.length}/${
-        buildingRecords.length
+      `Inserted ${i + recordsToInsert.length}/${buildingRecords.length
       } buildings`
     );
   }
@@ -148,12 +146,11 @@ if (values.gate) {
 
   for (let i = 0; i < gateGroupGates.length; i += batchSize) {
     const recordsToInsert = gateGroupGates.slice(i, i + batchSize);
-    await sql`INSERT INTO distributed.gate_and_gatetogategroup_view ${sql(
+    await sql`INSERT INTO distributed.gatetogategroup_view ${sql(
       gateGroupGates.slice(i, i + batchSize)
     )}`;
     console.log(
-      `Inserted ${i + recordsToInsert.length}/${
-        gateGroupGates.length
+      `Inserted ${i + recordsToInsert.length}/${gateGroupGates.length
       } gategroupgates`
     );
   }
@@ -166,8 +163,7 @@ if (values.accessright) {
     await sql`SELECT badgeid, region FROM distributed.person_view WHERE badgeid NOT IN (SELECT badgeid FROM distributed.accessright_view)`;
 
   console.log(
-    `Fetched ${persons.length} persons (eu: ${
-      persons.filter((p) => p.region === "EU").length
+    `Fetched ${persons.length} persons (eu: ${persons.filter((p) => p.region === "EU").length
     }, us: ${persons.filter((p) => p.region === "US").length})`
   );
 
@@ -178,8 +174,7 @@ if (values.accessright) {
       ON gategroup.buildingid = building.buildingid`;
 
   console.log(
-    `Fetched ${gategroups.length} gategroups (eu: ${
-      gategroups.filter((g) => g.region === "EU").length
+    `Fetched ${gategroups.length} gategroups (eu: ${gategroups.filter((g) => g.region === "EU").length
     }, us: ${gategroups.filter((g) => g.region === "US").length})`
   );
 
@@ -200,8 +195,7 @@ if (values.accessright) {
       accessRights.slice(i, i + batchSize)
     )}`;
     console.log(
-      `Inserted ${i + recordsToInsert.length}/${
-        accessRights.length
+      `Inserted ${i + recordsToInsert.length}/${accessRights.length
       } accessrights`
     );
   }
@@ -220,7 +214,7 @@ if (values.simulation) {
 
   const gateGroupGates = await sql`
     SELECT gategroupid, gateid, direction
-    FROM distributed.gate_and_gatetogategroup_view`;
+    FROM distributed.gatetogategroup_view`;
 
   console.log(`Fetched ${gateGroupGates.length} gategroupgates`);
 
@@ -259,7 +253,7 @@ if (values.simulation) {
 
   for (let i = 0; i < simulations.length; i++) {
     console.log(simulations[i]);
-    await sql`SELECT distributed.enter_building(${simulations[i].badgeid}, ${simulations[i].gateid})`;
+    await sql`SELECT distributed.enter_workspace(${simulations[i].badgeid}, ${simulations[i].gateid})`;
     console.log(`Inserted ${i + 1}/${simulations.length} simulations`);
   }
 }

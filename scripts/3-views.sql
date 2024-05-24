@@ -30,15 +30,13 @@ UNION ALL
     SELECT gateId
     FROM eu_remote.gate;
 
--- Creating a view for inserts of new gates through the distributed.create_gate_and_gatetogategroup function
-CREATE OR REPLACE VIEW distributed.gate_and_gatetogategroup_view AS
-    SELECT gate.gateId, gatetogategroup.gateGroupId, gatetogategroup.direction
-    FROM us_remote.gate
-    JOIN us_remote.gatetogategroup ON us_remote.gate.gateId = us_remote.gatetogategroup.gateId
+-- Gate to Gate Group
+CREATE OR REPLACE VIEW distributed.gatetogategroup_view AS
+    SELECT gateId, gateGroupId, direction
+    FROM us_remote.gatetogategroup
 UNION ALL
-    SELECT gate.gateId, gatetogategroup.gateGroupId, gatetogategroup.direction
-    FROM eu_remote.gate
-    JOIN eu_remote.gatetogategroup ON eu_remote.gate.gateId = eu_remote.gatetogategroup.gateId;
+    SELECT gateId, gateGroupId, direction
+    FROM eu_remote.gatetogategroup;
 
 -- Access Right
 CREATE OR REPLACE VIEW distributed.accessright_view AS
@@ -50,10 +48,10 @@ UNION ALL
 
 -- Access Log
 CREATE OR REPLACE VIEW distributed.accesslog_view AS
-    SELECT accesslogid, gateId, badgeId, accessTime
+    SELECT accesslogid, gateId, badgeId, accessTime, success
     FROM us_remote.accesslog
 UNION ALL
-    SELECT accesslogid, gateId, badgeId, accessTime
+    SELECT accesslogid, gateId, badgeId, accessTime, success
     FROM eu_remote.accesslog;
 
 -- Presence Log

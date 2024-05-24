@@ -246,8 +246,8 @@ INSTEAD OF DELETE ON distributed.gategroup_view
 FOR EACH ROW
 EXECUTE FUNCTION distributed.delete_gategroup();
 
--- Gate
-CREATE OR REPLACE FUNCTION distributed.insert_gate_and_gatetogategroup_trigger() RETURNS TRIGGER AS $$
+-- Gate to Gate Group
+CREATE OR REPLACE FUNCTION distributed.insert_gatetogategroup_trigger() RETURNS TRIGGER AS $$
 DECLARE
     building_region Region;
 BEGIN
@@ -265,16 +265,16 @@ BEGIN
 
     IF building_region IS NOT NULL THEN
         IF building_region = 'US'::region THEN
-            -- Insert gate in the US remote schema
-            INSERT INTO us_remote.gate (gateId) VALUES (NEW.gateId);
+            -- Insert gate in the US remote schema if the gate does not exist
+            INSERT INTO us_remote.gate (gateId) VALUES (NEW.gateId) ON CONFLICT DO NOTHING;
 
             -- Insert GateToGateGroup in the US remote schema
             INSERT INTO us_remote.gatetogategroup (gateToGateGroupId, gateId, gateGroupId, direction)
             VALUES (gen_random_uuid(), NEW.gateId, NEW.gateGroupId, NEW.direction);
 
         ELSIF building_region = 'EU'::region THEN
-            -- Insert gate in the EU remote schema
-            INSERT INTO eu_remote.gate (gateId) VALUES (NEW.gateId);
+            -- Insert gate in the EU remote schema if the gate does not exist
+            INSERT INTO eu_remote.gate (gateId) VALUES (NEW.gateId) ON CONFLICT DO NOTHING;
 
             -- Insert GateToGateGroup in the EU remote schema
             INSERT INTO eu_remote.gatetogategroup (gateToGateGroupId, gateId, gateGroupId, direction)
@@ -289,7 +289,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION distributed.update_gate_and_gatetogategroup_trigger() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION distributed.update_gatetogategroup_trigger() RETURNS TRIGGER AS $$
 DECLARE
     building_region Region;
 BEGIN
@@ -322,7 +322,7 @@ BEGIN
 end;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION distributed.delete_gate_and_gatetogategroup_trigger() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION distributed.delete_gatetogategroup_trigger() RETURNS TRIGGER AS $$
 DECLARE
     building_region Region;
 BEGIN
@@ -355,20 +355,94 @@ BEGIN
 end;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER instead_of_insert_gate_and_gatetogategroup
-INSTEAD OF INSERT ON distributed.gate_and_gatetogategroup_view
+CREATE OR REPLACE TRIGGER instead_of_insert_gatetogategroup
+INSTEAD OF INSERT ON distributed.gatetogategroup_view
 FOR EACH ROW
-EXECUTE FUNCTION distributed.insert_gate_and_gatetogategroup_trigger();
+EXECUTE FUNCTION distributed.insert_gatetogategroup_trigger();
 
-CREATE OR REPLACE TRIGGER instead_of_update_gate_and_gatetogategroup
-INSTEAD OF UPDATE ON distributed.gate_and_gatetogategroup_view
+CREATE OR REPLACE TRIGGER instead_of_update_gatetogategroup
+INSTEAD OF UPDATE ON distributed.gatetogategroup_view
 FOR EACH ROW
-EXECUTE FUNCTION distributed.update_gate_and_gatetogategroup_trigger();
+EXECUTE FUNCTION distributed.update_gatetogategroup_trigger();
 
-CREATE OR REPLACE TRIGGER instead_of_delete_gate_and_gatetogategroup
-INSTEAD OF DELETE ON distributed.gate_and_gatetogategroup_view
+CREATE OR REPLACE TRIGGER instead_of_delete_gatetogategroup
+INSTEAD OF DELETE ON distributed.gatetogategroup_view
 FOR EACH ROW
-EXECUTE FUNCTION distributed.delete_gate_and_gatetogategroup_trigger();
+EXECUTE FUNCTION distributed.delete_gatetogategroup_trigger();
+
+-- Gate
+CREATE OR REPLACE FUNCTION distributed.insert_gate() RETURNS TRIGGER AS $$
+DECLARE
+    building_region Region;
+BEGIN
+    -- Find the region of the associated building in the US remote schema
+    SELECT region INTO building_region
+    FROM us_remote.building
+    WHERE buildingId = (SELECT buildingId FROM us_remote.gategroup WHERE gateGroupId = NEW.gateGroupId);
+
+    -- If not found in the US remote schema, check the EU remote schema
+    IF building_region IS NULL THEN
+        SELECT region INTO building_region
+        FROM eu_remote.building
+        WHERE buildingId = (SELECT buildingId FROM eu_remote.gategroup WHERE gateGroupId = NEW.gateGroupId);
+    END IF;
+
+    IF building_region IS NOT NULL THEN
+        IF building_region = 'US'::region THEN
+            INSERT INTO us_remote.gate (gateId) VALUES (NEW.gateId);
+        ELSIF building_region = 'EU'::region THEN
+            INSERT INTO eu_remote.gate (gateId) VALUES (NEW.gateId);
+        END IF;
+
+        PERFORM distributed.log(building_region, 'INSERT', 'gate', NEW.gateId::text);
+    ELSE
+        RAISE EXCEPTION 'Building not found or invalid region for gateGroupId: %', NEW.gateGroupId;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION distributed.delete_gate() RETURNS TRIGGER AS $$
+DECLARE
+    building_region Region;
+BEGIN
+    -- Find the region of the associated building in the US remote schema
+    SELECT region INTO building_region
+    FROM us_remote.building
+    WHERE buildingId = (SELECT buildingId FROM us_remote.gategroup WHERE gateGroupId = OLD.gateGroupId);
+
+    -- If not found in the US remote schema, check the EU remote schema
+    IF building_region IS NULL THEN
+        SELECT region INTO building_region
+        FROM eu_remote.building
+        WHERE buildingId = (SELECT buildingId FROM eu_remote.gategroup WHERE gateGroupId = OLD.gateGroupId);
+    END IF;
+
+    IF building_region IS NOT NULL THEN
+        IF building_region = 'US'::region THEN
+            DELETE FROM us_remote.gate WHERE gateId = OLD.gateId;
+        ELSIF building_region = 'EU'::region THEN
+            DELETE FROM eu_remote.gate WHERE gateId = OLD.gateId;
+        END IF;
+
+        PERFORM distributed.log(building_region, 'DELETE', 'gate', OLD.gateId::text);
+    ELSE
+        RAISE EXCEPTION 'Building not found or invalid region for gateGroupId: %', OLD.gateGroupId;
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER instead_of_insert_gate
+INSTEAD OF INSERT ON distributed.gate_view
+FOR EACH ROW
+EXECUTE FUNCTION distributed.insert_gate();
+
+CREATE OR REPLACE TRIGGER instead_of_delete_gate
+INSTEAD OF DELETE ON distributed.gate_view
+FOR EACH ROW
+EXECUTE FUNCTION distributed.delete_gate();
+
 
 -- Access Right
 
