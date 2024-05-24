@@ -2,10 +2,8 @@ import postgres from "postgres";
 import { faker } from "@faker-js/faker";
 import { parseArgs } from "util";
 
-const batchSize = 5000;
-
 const sql = postgres(
-  "postgres://postgres:postgres@bdr-us-1.epsilon:5432/postgres"
+  "postgres://postgres:postgres@bdr-eu-1.epsilon:5432/postgres"
 );
 
 const { values } = parseArgs({
@@ -38,6 +36,46 @@ const { values } = parseArgs({
   allowPositionals: true,
 });
 
+const runQueries = async (name: string, promises: Promise<any>[]) => {
+  let progress = 0;
+
+  promises.forEach((promise) => {
+    promise.then(() => {
+      progress++;
+    });
+  });
+
+  let lastProgress = 0;
+  const deltaArray: number[] = [];
+  let peakDelta = 0;
+
+  const elapsed = Date.now();
+
+  const interval = setInterval(() => {
+    const progressDelta = progress - lastProgress;
+    deltaArray.push(progressDelta);
+    lastProgress = progress;
+
+    if (progressDelta > peakDelta) {
+      peakDelta = progressDelta;
+    }
+
+    console.log(
+      `${name} - ${new Date().toISOString()} | Progress: ${progress}/${
+        promises.length
+      } (cur: ${progressDelta}/s - avg: ${Math.round(
+        deltaArray.reduce((acc, curr) => acc + curr, 0) / deltaArray.length
+      )}/s - peak: ${peakDelta}/s)`
+    );
+  }, 1000);
+
+  await Promise.all(promises);
+
+  console.log(`${name} - Elapsed: ${Date.now() - elapsed}ms`);
+
+  clearInterval(interval);
+};
+
 // Persons
 
 if (values.person) {
@@ -53,15 +91,14 @@ if (values.person) {
     region: faker.helpers.arrayElement(["EU", "US"]),
   }));
 
-  for (let i = 0; i < personRecords.length; i += batchSize) {
-    const recordsToInsert = personRecords.slice(i, i + batchSize);
-    await sql`INSERT INTO distributed.person_view ${sql(
-      personRecords.slice(i, i + batchSize)
-    )}`;
-    console.log(
-      `Inserted ${i + recordsToInsert.length}/${personRecords.length} persons`
-    );
-  }
+  console.log(`Created ${personRecords.length} persons`);
+
+  await runQueries(
+    "person",
+    personRecords.map((person) => {
+      return sql`INSERT INTO distributed.person_view ${sql(person)}`;
+    })
+  );
 
   console.log("Inserted persons");
 }
@@ -84,16 +121,12 @@ if (values.building) {
     })
   );
 
-  for (let i = 0; i < buildingRecords.length; i += batchSize) {
-    const recordsToInsert = buildingRecords.slice(i, i + batchSize);
-    await sql`INSERT INTO distributed.building_view ${sql(
-      buildingRecords.slice(i, i + batchSize)
-    )}`;
-    console.log(
-      `Inserted ${i + recordsToInsert.length}/${buildingRecords.length
-      } buildings`
-    );
-  }
+  await runQueries(
+    "building",
+    buildingRecords.map((building) => {
+      return sql`INSERT INTO distributed.building_view ${sql(building)}`;
+    })
+  );
 
   console.log("Inserted buildings");
 }
@@ -121,15 +154,12 @@ if (values.gate) {
     buildingid: buildings[i].buildingid,
   }));
 
-  for (let i = 0; i < gateGroups.length; i += batchSize) {
-    const recordsToInsert = gateGroups.slice(i, i + batchSize);
-    await sql`INSERT INTO distributed.gategroup_view ${sql(
-      gateGroups.slice(i, i + batchSize)
-    )}`;
-    console.log(
-      `Inserted ${i + recordsToInsert.length}/${gateGroups.length} gategroups`
-    );
-  }
+  await runQueries(
+    "gategroup_view",
+    gateGroups.map((gategroup) => {
+      return sql`INSERT INTO distributed.gategroup_view ${sql(gategroup)}`;
+    })
+  );
 
   const gates = Array.from({ length: number }, (_, i) => ({
     gateid: crypto.randomUUID(),
@@ -144,18 +174,16 @@ if (values.gate) {
     };
   });
 
-  for (let i = 0; i < gateGroupGates.length; i += batchSize) {
-    const recordsToInsert = gateGroupGates.slice(i, i + batchSize);
-    await sql`INSERT INTO distributed.gatetogategroup_view ${sql(
-      gateGroupGates.slice(i, i + batchSize)
-    )}`;
-    console.log(
-      `Inserted ${i + recordsToInsert.length}/${gateGroupGates.length
-      } gategroupgates`
-    );
-  }
+  await runQueries(
+    "gatetogategroup_view",
+    gateGroupGates.map((gategroupgate) => {
+      return sql`INSERT INTO distributed.gatetogategroup_view ${sql(
+        gategroupgate
+      )}`;
+    })
+  );
 
-  console.log("Inserted gates");
+  console.log("Inserted gatetogategroup_view");
 }
 
 if (values.accessright) {
@@ -163,7 +191,8 @@ if (values.accessright) {
     await sql`SELECT badgeid, region FROM distributed.person_view WHERE badgeid NOT IN (SELECT badgeid FROM distributed.accessright_view)`;
 
   console.log(
-    `Fetched ${persons.length} persons (eu: ${persons.filter((p) => p.region === "EU").length
+    `Fetched ${persons.length} persons (eu: ${
+      persons.filter((p) => p.region === "EU").length
     }, us: ${persons.filter((p) => p.region === "US").length})`
   );
 
@@ -174,7 +203,8 @@ if (values.accessright) {
       ON gategroup.buildingid = building.buildingid`;
 
   console.log(
-    `Fetched ${gategroups.length} gategroups (eu: ${gategroups.filter((g) => g.region === "EU").length
+    `Fetched ${gategroups.length} gategroups (eu: ${
+      gategroups.filter((g) => g.region === "EU").length
     }, us: ${gategroups.filter((g) => g.region === "US").length})`
   );
 
@@ -189,16 +219,12 @@ if (values.accessright) {
     };
   });
 
-  for (let i = 0; i < accessRights.length; i += batchSize) {
-    const recordsToInsert = accessRights.slice(i, i + batchSize);
-    await sql`INSERT INTO distributed.accessright_view ${sql(
-      accessRights.slice(i, i + batchSize)
-    )}`;
-    console.log(
-      `Inserted ${i + recordsToInsert.length}/${accessRights.length
-      } accessrights`
-    );
-  }
+  await runQueries(
+    "accessright",
+    accessRights.map((accessright) => {
+      return sql`INSERT INTO distributed.accessright_view ${sql(accessright)}`;
+    })
+  );
 
   console.log("Inserted accessrights");
 }
@@ -251,9 +277,12 @@ if (values.simulation) {
 
   console.log(`Created ${simulations.length} simulations`);
 
-  for (let i = 0; i < simulations.length; i++) {
-    console.log(simulations[i]);
-    await sql`SELECT distributed.enter_workspace(${simulations[i].badgeid}, ${simulations[i].gateid})`;
-    console.log(`Inserted ${i + 1}/${simulations.length} simulations`);
-  }
+  await runQueries(
+    "simulation",
+    simulations.map((simulation) => {
+      return sql`SELECT distributed.enter_workspace(${simulation.badgeid}, ${simulation.gateid})`;
+    })
+  );
+
+  console.log("Simulation completed");
 }
